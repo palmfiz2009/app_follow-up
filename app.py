@@ -86,8 +86,8 @@ hcol1, hcol2 = st.columns(2)
 with hcol1:
     st.session_state.facility_name = st.selectbox("施設名*", FACILITY_LIST, index=get_idx(FACILITY_LIST, st.session_state.facility_name))
     st.session_state.patient_id = st.text_input("研究対象者識別コード*", value=st.session_state.patient_id)
-    # --- 修正点：手術日を「手術（予定）日」に変更 ---
-    st.session_state.op_date = st.date_input("手術（予定）日*", value=st.session_state.op_date)
+    # --- 修正点：文言の最適化 ---
+    st.session_state.op_date = st.date_input("手術日（非施行例は予定日）*", value=st.session_state.op_date)
 with hcol2:
     st.session_state.reporter_email = st.text_input("担当者メールアドレス*", value=st.session_state.reporter_email)
     timings = ["選択してください", "術後6ヶ月後", "術後9ヶ月後", "術後12ヶ月後", "術後15ヶ月後", "術後18ヶ月後", "術後21ヶ月後", "術後24ヶ月後"]
@@ -117,7 +117,7 @@ with pcol1:
         
         st.session_state.cyto_res = st.selectbox("尿細胞診 結果*", ["選択してください", "Negative (クラスI・II)", "AUC (非定型細胞)", "SHGUC (高異型度癌疑い)", "HGUC (クラスIV・V相当)", "LGUC (低異型度腫瘍)", "判定不能", "未実施"], index=get_idx(["選択してください", "Negative (クラスI・II)", "AUC (非定型細胞)", "SHGUC (高異型度癌疑い)", "HGUC (クラスIV・V相当)", "LGUC (低異型度腫瘍)", "判定不能", "未実施"], st.session_state.cyto_res), help=HELP_CYTO)
         
-        intra_tx_opts = ["経過観察", "TURBT", "BCG注入療法", "抗がん剤注入療法", "上部尿路内視鏡的治療", "手術（腎尿管全摘等）", "その他"]
+        intra_tx_opts = ["経過観察", "TURBT", "BCG注入療法", "抗がん剤注入療法", "上部尿路内内視鏡的治療", "手術（腎尿管全摘等）", "その他"]
         st.session_state.pfs_intra_tx = st.multiselect("実施した治療*", intra_tx_opts, default=st.session_state.pfs_intra_tx)
         
         selected_intra_surgeries = [x for x in st.session_state.pfs_intra_tx if x in SURGERY_LIST]
@@ -227,7 +227,7 @@ if st.button("🚀 事務局へ確定送信", type="primary", use_container_widt
     if d.facility_name == "選択してください": err.append("・施設名")
     if not d.patient_id: err.append("・識別コード")
     if d.report_timing == "選択してください": err.append("・報告時期")
-    if not d.op_date: err.append("・手術（予定）日") # エラー文言も修正
+    if not d.op_date: err.append("・手術日（非施行例は予定日）") # エラー文言も修正
     
     if d.status_alive is None: err.append("・生存状況")
     if d.pfs_intra == "あり":
