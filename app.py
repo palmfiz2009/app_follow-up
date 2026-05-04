@@ -86,7 +86,8 @@ hcol1, hcol2 = st.columns(2)
 with hcol1:
     st.session_state.facility_name = st.selectbox("施設名*", FACILITY_LIST, index=get_idx(FACILITY_LIST, st.session_state.facility_name))
     st.session_state.patient_id = st.text_input("研究対象者識別コード*", value=st.session_state.patient_id)
-    st.session_state.op_date = st.date_input("手術日*", value=st.session_state.op_date)
+    # --- 修正点：手術日を「手術（予定）日」に変更 ---
+    st.session_state.op_date = st.date_input("手術（予定）日*", value=st.session_state.op_date)
 with hcol2:
     st.session_state.reporter_email = st.text_input("担当者メールアドレス*", value=st.session_state.reporter_email)
     timings = ["選択してください", "術後6ヶ月後", "術後9ヶ月後", "術後12ヶ月後", "術後15ヶ月後", "術後18ヶ月後", "術後21ヶ月後", "術後24ヶ月後"]
@@ -119,14 +120,12 @@ with pcol1:
         intra_tx_opts = ["経過観察", "TURBT", "BCG注入療法", "抗がん剤注入療法", "上部尿路内視鏡的治療", "手術（腎尿管全摘等）", "その他"]
         st.session_state.pfs_intra_tx = st.multiselect("実施した治療*", intra_tx_opts, default=st.session_state.pfs_intra_tx)
         
-        # 動的ラベル日程（手術 - image_d19a3c.png準拠レイアウト）
         selected_intra_surgeries = [x for x in st.session_state.pfs_intra_tx if x in SURGERY_LIST]
         if selected_intra_surgeries:
             label_op = f"{' + '.join(selected_intra_surgeries)} 実施日*"
             st.session_state.intra_op_date = st.date_input(label_op, value=st.session_state.intra_op_date, key="intra_op")
             st.session_state.pfs_intra_path = st.text_area("組織型、Grade、pTNM分類 等*", value=st.session_state.pfs_intra_path, key="p_intra")
 
-        # 動的ラベル日程（薬物）
         selected_intra_drugs = [x for x in st.session_state.pfs_intra_tx if x in DRUG_LIST]
         if selected_intra_drugs:
             label_drug = f"{' + '.join(selected_intra_drugs)}"
@@ -152,7 +151,6 @@ with pcol2:
         extra_tx_opts = ["選択してください", "プラチナ製剤併用療法（GC療法）", "プラチナ製剤併用療法（GCarbo療法）", "維持療法（アベルマブ等）", "EVP療法", "ペムブロリズマブ単剤", "ニボルマブ単剤", "サシツズマブ ゴビテカン（SG）", "FGFR阻害薬", "治験（HER2標的ADC、TROP2標的ADC、その他）", "手術（転移巣切除）", "放射線治療", "緩和ケア", "その他"]
         st.session_state.pfs_extra_tx = st.selectbox("主たる実施治療*", extra_tx_opts, index=get_idx(extra_tx_opts, st.session_state.pfs_extra_tx))
         
-        # 動的ラベル日程（外）
         cur_extra_tx = st.session_state.pfs_extra_tx
         if cur_extra_tx in ["手術（転移巣切除）"]:
             st.session_state.extra_op_date = st.date_input(f"{cur_extra_tx} 実施日*", value=st.session_state.extra_op_date, key="extra_op")
@@ -175,7 +173,6 @@ if st.session_state.has_event:
     cd_opts = ["なし", "Grade I", "Grade II", "Grade IIIa", "Grade IIIb", "Grade IVa", "Grade IVb", "Grade V"]
     st.session_state.cd_grade = ec1.selectbox("Clavien-Dindo分類*", cd_opts, index=get_idx(cd_opts, st.session_state.cd_grade), help=HELP_CD)
     st.session_state.ae_status = ec2.text_area("有害事象の詳細（CTCAE準拠）*", value=st.session_state.ae_status, placeholder="発現日、内容、処置、転帰を記入")
-    # 吉田先生ご指定の最新PDFリンクへの差し替えと配置
     st.markdown("<div style='text-align: right;'><small>参照： <a href='https://jcog.jp/assets/CTCAEv6J_20260301_v28_0.pdf' target='_blank'>CTCAE v6.0 日本語訳 (JCOG版)</a></small></div>", unsafe_allow_html=True)
 
 # --- 4. 採血 (12/24ヶ月目必須) ---
@@ -204,11 +201,10 @@ with scol1:
         st.session_state.final_date = st.date_input("最終生存確認日*", value=st.session_state.final_date)
     elif st.session_state.status_alive == "死亡":
         st.session_state.death_date = st.date_input("死亡日*", value=st.session_state.death_date)
-        st.session_state.death_cause = st.selectbox("死因*", ["選択してください", "癌死", "治療関連死", "他病死", "不明"], index=get_idx(["選択してください", "癌死", "治療関連死", "他病死", "不明"], st.session_state.death_cause))
+        st.session_state.death_cause = st.selectbox("死因*", ["選択してください", "癌死 (原疾患による)", "治療関連死", "他病死", "不明"], index=get_idx(["選択してください", "癌死 (原疾患による)", "治療関連死", "他病死", "不明"], st.session_state.death_cause))
 
 with scol2:
     if st.session_state.status_alive == "生存":
-        # 吉田先生ご指示のリアルワールド対応・維持療法シナリオの追加
         tx_opts = [
             "選択してください", 
             "無治療（経過観察）", 
@@ -231,6 +227,8 @@ if st.button("🚀 事務局へ確定送信", type="primary", use_container_widt
     if d.facility_name == "選択してください": err.append("・施設名")
     if not d.patient_id: err.append("・識別コード")
     if d.report_timing == "選択してください": err.append("・報告時期")
+    if not d.op_date: err.append("・手術（予定）日") # エラー文言も修正
+    
     if d.status_alive is None: err.append("・生存状況")
     if d.pfs_intra == "あり":
         if any(x in d.pfs_intra_tx for x in SURGERY_LIST) and not d.intra_op_date: err.append("・手術・処置日(内)")
