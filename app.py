@@ -1,4 +1,5 @@
 import streamlit as st
+import json
 from datetime import date, datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -118,7 +119,7 @@ with pcol1:
         intra_tx_opts = ["経過観察", "TURBT", "BCG注入療法", "抗がん剤注入療法", "上部尿路内視鏡的治療", "手術（腎尿管全摘等）", "その他"]
         st.session_state.pfs_intra_tx = st.multiselect("実施した治療*", intra_tx_opts, default=st.session_state.pfs_intra_tx)
         
-        # 動的ラベル日程（手術 - image_d19a3c.png準拠レイアウト）
+        # 動的ラベル日程
         selected_intra_surgeries = [x for x in st.session_state.pfs_intra_tx if x in SURGERY_LIST]
         if selected_intra_surgeries:
             label_op = f"{' + '.join(selected_intra_surgeries)} 実施日*"
@@ -174,7 +175,6 @@ if st.session_state.has_event:
     cd_opts = ["なし", "Grade I", "Grade II", "Grade IIIa", "Grade IIIb", "Grade IVa", "Grade IVb", "Grade V"]
     st.session_state.cd_grade = ec1.selectbox("Clavien-Dindo分類*", cd_opts, index=get_idx(cd_opts, st.session_state.cd_grade), help=HELP_CD)
     st.session_state.ae_status = ec2.text_area("有害事象の詳細（CTCAE準拠）*", value=st.session_state.ae_status, placeholder="発現日、内容、処置、転帰を記入")
-    # 吉田先生ご指定の最新PDFリンクへの差し替えと配置
     st.markdown("<div style='text-align: right;'><small>参照： <a href='https://jcog.jp/assets/CTCAEv6J_20260301_v28_0.pdf' target='_blank'>CTCAE v6.0 日本語訳 (JCOG版)</a></small></div>", unsafe_allow_html=True)
 
 # --- 4. 採血 (12/24ヶ月目必須) ---
@@ -207,7 +207,8 @@ with scol1:
 
 with scol2:
     if st.session_state.status_alive == "生存":
-        tx_opts = ["選択してください", "無治療（経過観察）", "上記再発に対する治療を継続中", "その他"]
+        # EVP継続・ペムブロ継続を追加
+        tx_opts = ["選択してください", "無治療（経過観察）", "EVP継続投与", "ペムブロ単剤維持", "上記再発に対する治療を継続中", "その他"]
         st.session_state.treat_status = st.selectbox("現在の治療状況*", tx_opts, index=get_idx(tx_opts, st.session_state.treat_status))
         if st.session_state.treat_status == "その他":
             st.session_state.treat_status_detail = st.text_input("詳細*", value=st.session_state.treat_status_detail, key="tx_cur_other")
