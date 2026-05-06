@@ -86,7 +86,6 @@ hcol1, hcol2 = st.columns(2)
 with hcol1:
     st.session_state.facility_name = st.selectbox("施設名*", FACILITY_LIST, index=get_idx(FACILITY_LIST, st.session_state.facility_name))
     st.session_state.patient_id = st.text_input("研究対象者識別コード*", value=st.session_state.patient_id)
-    # --- 修正点：文言の最適化 ---
     st.session_state.op_date = st.date_input("手術日（非施行例は予定日）*", value=st.session_state.op_date)
 with hcol2:
     st.session_state.reporter_email = st.text_input("担当者メールアドレス*", value=st.session_state.reporter_email)
@@ -227,7 +226,23 @@ if st.button("🚀 事務局へ確定送信", type="primary", use_container_widt
     if d.facility_name == "選択してください": err.append("・施設名")
     if not d.patient_id: err.append("・識別コード")
     if d.report_timing == "選択してください": err.append("・報告時期")
-    if not d.op_date: err.append("・手術日（非施行例は予定日）") # エラー文言も修正
+    if not d.op_date: err.append("・手術日（非施行例は予定日）")
+    
+    # --- 【追加】タイムライン（日付）の矛盾チェック ---
+    if d.op_date:
+        if d.pfs_intra_date and d.pfs_intra_date < d.op_date: err.append("・[日付エラー] 尿路内再発の診断日が手術日より前です")
+        if d.intra_op_date and d.intra_op_date < d.op_date: err.append("・[日付エラー] 尿路内再発の手術・処置日が手術日より前です")
+        if d.intra_tx_start and d.intra_tx_start < d.op_date: err.append("・[日付エラー] 尿路内再発の薬物開始日が手術日より前です")
+        if d.intra_tx_start and d.intra_tx_end and d.intra_tx_end < d.intra_tx_start: err.append("・[日付エラー] 尿路内再発治療の終了日が開始日より前です")
+        
+        if d.pfs_extra_date and d.pfs_extra_date < d.op_date: err.append("・[日付エラー] 尿路外再発の診断日が手術日より前です")
+        if d.extra_op_date and d.extra_op_date < d.op_date: err.append("・[日付エラー] 尿路外再発の手術実施日が手術日より前です")
+        if d.extra_tx_start and d.extra_tx_start < d.op_date: err.append("・[日付エラー] 尿路外再発の薬物開始日が手術日より前です")
+        if d.extra_tx_start and d.extra_tx_end and d.extra_tx_end < d.extra_tx_start: err.append("・[日付エラー] 尿路外再発治療の終了日が開始日より前です")
+        
+        if d.final_date and d.final_date < d.op_date: err.append("・[日付エラー] 最終生存確認日が手術日より前です")
+        if d.death_date and d.death_date < d.op_date: err.append("・[日付エラー] 死亡日が手術日より前です")
+    # ------------------------------------------------
     
     if d.status_alive is None: err.append("・生存状況")
     if d.pfs_intra == "あり":
@@ -237,5 +252,54 @@ if st.button("🚀 事務局へ確定送信", type="primary", use_container_widt
 
     if err: st.error("入力不備があります：\n" + "\n".join(err))
     else:
-        if send_email("CRF_DATA", d.patient_id, d.facility_name, d.reporter_email):
+        # --- 【修正】メール本文を全項目フル出力に変更 ---
+        def f_num(val): return str(val) if val is not None else "N/A"
+        
+        rep = f"""【JUOG 定期経過報告】
+施設名: {d.facility_name}
+研究対象者識別コード: {d.patient_id}
+報告者メールアドレス: {d.reporter_email}
+報告時期: {d.report_timing}
+手術日（非施行例は予定日）: {d.op_date}
+
+--- 2. 再発状況 ---
+【尿路内再発】: {d.pfs_intra}
+診断日: {d.pfs_intra_date}
+再発部位: {', '.join(d.pfs_intra_site) if d.pfs_intra_site else 'N/A'} (詳細: {d.pfs_intra_site_other})
+尿細胞診結果: {d.cyto_res}
+実施した治療: {', '.join(d.pfs_intra_tx) if d.pfs_intra_tx else 'N/A'} (詳細: {d.pfs_intra_tx_other})
+手術・処置実施日: {d.intra_op_date}
+組織型等: {d.pfs_intra_path}
+薬物療法開始日: {d.intra_tx_start}
+薬物療法終了日: {d.intra_tx_end} (継続中: {'はい' if d.intra_tx_ongoing else 'いいえ'})
+
+【尿路外再発】: {d.pfs_extra}
+診断日: {d.pfs_extra_date}
+再発部位: {', '.join(d.pfs_extra_site) if d.pfs_extra_site else 'N/A'} (詳細: {d.pfs_extra_site_other})
+主たる実施治療: {d.pfs_extra_tx}
+詳細: {d.pfs_extra_tx_detail}
+手術実施日: {d.extra_op_date}
+薬物療法開始日: {d.extra_tx_start}
+薬物療法終了日: {d.extra_tx_end} (継続中: {'はい' if d.extra_tx_ongoing else 'いいえ'})
+
+--- 3. 有害事象・合併症 ---
+特記すべき事象あり: {'はい' if d.has_event else 'いいえ'}
+CD分類: {d.cd_grade}
+有害事象詳細: {d.ae_status}
+
+--- 4. 採血検査データ ---
+WBC: {f_num(d.lab_WBC)} /μL, Hb: {f_num(d.lab_Hb)} g/dL, PLT: {f_num(d.lab_PLT)} x10^4/μL
+AST: {f_num(d.lab_AST)} U/L, ALT: {f_num(d.lab_ALT)} U/L, LDH: {f_num(d.lab_LDH)} U/L
+Alb: {f_num(d.lab_Alb)} g/dL, Cre: {f_num(d.lab_Cre)} mg/dL, eGFR: {f_num(d.lab_eGFR)}
+CRP: {f_num(d.lab_CRP)} mg/dL
+白血球分画: Neutro {f_num(d.lab_Neutro)}%, Lympho {f_num(d.lab_Lympho)}%, Mono {f_num(d.lab_Mono)}%, Eosino {f_num(d.lab_Eosino)}%, Baso {f_num(d.lab_Baso)}%
+
+--- 5. 生存状況・現在の治療状況 ---
+生存状況: {d.status_alive}
+最終生存確認日: {d.final_date}
+死亡日: {d.death_date}
+死因: {d.death_cause}
+現在の治療状況: {d.treat_status} (詳細: {d.treat_status_detail})
+"""
+        if send_email(rep, d.patient_id, d.facility_name, d.reporter_email):
             st.success("確定送信されました。臨床研究へのご協力ありがとうございます。"); st.balloons()
